@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.cuda.amp import autocast, GradScaler
 
-from datasets import MVTecDataset, VisADataset
+from datasets import MVTecDataset, VisADataset, SMAPDataset
 from models.extractors import build_extractor
 from models.flow_models import build_msflow_model
 from post_process import post_process
@@ -137,7 +137,14 @@ def train(c):
             group=c.version_name,
             name=c.class_name)
     
-    Dataset = MVTecDataset if c.dataset == 'mvtec' else VisADataset
+    if c.dataset == 'mvtec':
+        Dataset = MVTecDataset
+    elif c.dataset == 'visa':
+        Dataset = VisADataset
+    elif c.dataset == 'smap':
+        Dataset = SMAPDataset
+    else:
+        raise ValueError(f"Unsupported dataset: {c.dataset}")
 
     train_dataset = Dataset(c, is_train=True)
     test_dataset  = Dataset(c, is_train=False)
@@ -172,7 +179,17 @@ def train(c):
         gt_label_list, gt_mask_list, outputs_list, size_list = inference_meta_epoch(c, epoch, test_loader, extractor, parallel_flows, fusion_flow)
 
         anomaly_score, anomaly_score_map_add, anomaly_score_map_mul = post_process(c, size_list, outputs_list)
-        best_det_auroc, best_loc_auroc, best_loc_pro = eval_det_loc(det_auroc_obs, loc_auroc_obs, loc_pro_obs, epoch, gt_label_list, anomaly_score, gt_mask_list, anomaly_score_map_add, anomaly_score_map_mul, c.pro_eval)
+        # export anomaly scores and maps for offline analysis
+        save_dir = os.path.join(c.ckpt_dir, 'scores')
+        os.makedirs(save_dir, exist_ok=True)
+        np.save(os.path.join(save_dir, 'anomaly_score.npy'), anomaly_score)
+        np.save(os.path.join(save_dir, 'anomaly_score_map_add.npy'), anomaly_score_map_add)
+        np.save(os.path.join(save_dir, 'anomaly_score_map_mul.npy'), anomaly_score_map_mul)
+        np.save(os.path.join(save_dir, 'filenames.npy'), np.asarray(test_loader.dataset.x))
+        np.save(os.path.join(save_dir, 'labels.npy'), np.asarray(gt_label_list))
+        det_auroc, loc_auroc, loc_pro_auc, \
+            best_det_auroc, best_loc_auroc, best_loc_pro = \
+                eval_det_loc(det_auroc_obs, loc_auroc_obs, loc_pro_obs, epoch, gt_label_list, anomaly_score, gt_mask_list, anomaly_score_map_add, anomaly_score_map_mul, c.pro_eval)
         
         return
     

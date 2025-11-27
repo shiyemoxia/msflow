@@ -15,9 +15,9 @@ def init_seeds(seed=0):
 
 def parsing_args(c):
     parser = argparse.ArgumentParser(description='msflow')
-    parser.add_argument('--dataset', default='mvtec', type=str, 
-                        choices=['mvtec', 'visa'], help='dataset name')
-    parser.add_argument('--mode', default='train', type=str, 
+    parser.add_argument('--dataset', default=c.dataset, type=str, 
+                        choices=['mvtec', 'visa', 'smap'], help='dataset name')
+    parser.add_argument('--mode', default=c.mode, type=str, 
                         help='train or test.')
     parser.add_argument('--amp_enable', action='store_true', default=False, 
                         help='use amp or not.')
@@ -25,7 +25,7 @@ def parsing_args(c):
                         help='use wandb for result logging or not.')
     parser.add_argument('--resume', action='store_true', default=False, 
                         help='resume training or not.')
-    parser.add_argument('--eval_ckpt', default='', type=str, 
+    parser.add_argument('--eval_ckpt', default=c.eval_ckpt, type=str, 
                         help='checkpoint path for evaluation.')
     parser.add_argument('--class-names', default=['all'], type=str, nargs='+', 
                         help='class names for training')
@@ -63,6 +63,10 @@ def parsing_args(c):
         setattr(c, 'data_path', './data/VisA_pytorch/1cls')
         if c.class_names == ['all']:
             setattr(c, 'class_names', VISA_CLASS_NAMES)
+    elif c.dataset == 'smap':
+        setattr(c, 'data_path', './1/data/data')
+        if c.class_names == ['all']:
+            setattr(c, 'class_names', ['SMAP'])
         
     c.input_size = (256, 256) if c.class_name == 'transistor' else (512, 512)
 
